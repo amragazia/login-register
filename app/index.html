@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerable WebApp</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; padding: 50px; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        input, button { width: 100%; margin: 10px 0; padding: 10px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background-color: #0056b3; }
+        .hidden { display: none; }
+        #message { color: red; text-align: center; font-size: 14px; }
+        .admin-btn { background-color: #28a745; }
+        .admin-btn:hover { background-color: #218838; }
+        .create-btn { background-color: #6c757d; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Login / Registration Section -->
+    <div id="auth-section">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button onclick="authenticate('login')">Login</button>
+        <button onclick="authenticate('create')" class="create-btn">Not a user? Create acc</button>
+        <p id="message"></p>
+    </div>
+
+    <!-- Authenticated Home Section -->
+    <div id="home-section" class="hidden">
+        <h2>User Profile</h2>
+        <div id="user-info" style="background: #e9ecef; padding: 10px; margin-bottom: 15px; border-radius: 4px; word-wrap: break-word;">
+            Loading user info...
+        </div>
+        
+        <button id="admin-btn" class="admin-btn hidden" onclick="loadDashboard()">Special Dashboard</button>
+        <p id="dashboard-info" style="color: #d39e00; font-weight: bold;"></p>
+        
+        <button onclick="logout()" style="background-color: #dc3545; margin-top: 20px;">Sign Out</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000"; 
+
+    async function authenticate(action) {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const msgEl = document.getElementById('message');
+        const endpoint = action === 'login' ? '/login' : '/create-user';
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                if (action === 'login') {
+                    // Save both token and username for the frontend routing
+                    localStorage.setItem('token', data.access_token); 
+                    localStorage.setItem('username', username);
+                    showHome(username);
+                } else {
+                    msgEl.style.color = "green";
+                    msgEl.innerText = "Account created! You can now login.";
+                }
+            } else {
+                msgEl.style.color = "red";
+                msgEl.innerText = data.detail || "An error occurred.";
+            }
+        } catch (err) {
+            msgEl.innerText = "Failed to connect to the server.";
+        }
+    }
+
+    async function showHome(username) {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('home-section').classList.remove('hidden');
+
+        // Reveal the admin button strictly if the username is "admin"
+        if (username === "admin") {
+            document.getElementById('admin-btn').classList.remove('hidden');
+        }
+
+        // Fetch the user's specific home data
+        const response = await fetch(`${API_URL}/home/${username}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('user-info').innerText = 
+                `ID: ${data.id}\nUsername: ${data.username}`;
+        } else {
+            logout(); 
+        }
+    }
+
+    async function loadDashboard() {
+        const token = localStorage.getItem('token');
+        const dashInfo = document.getElementById('dashboard-info');
+        
+        const response = await fetch(`${API_URL}/home/dashboard`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            dashInfo.innerText = `${data.secret_data} | Balance: ${data.balance}`;
+        } else {
+            dashInfo.innerText = "Access Denied.";
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        document.getElementById('auth-section').classList.remove('hidden');
+        document.getElementById('home-section').classList.add('hidden');
+        document.getElementById('admin-btn').classList.add('hidden');
+        document.getElementById('dashboard-info').innerText = "";
+        document.getElementById('message').innerText = "Logged out.";
+        document.getElementById('username').value = "";
+        document.getElementById('password').value = "";
+    }
+
+    // Persist login state on page refresh
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('username');
+    if (savedToken && savedUser) {
+        showHome(savedUser);
+    }
+</script>
+
+</body>
+</html>
