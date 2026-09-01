@@ -1,0 +1,11 @@
+[project]
+name = "login-register"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "pyjwt>=2.13.0",
+    "requests>=2.34.2",
+]

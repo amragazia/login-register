@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vulnerable WebApp</title>
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="./images/IMG-20251130-WA0100(1).jpg"
+    />
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -46,7 +51,6 @@
         font-size: 14px;
       }
 
-      /* Button Specific Colors */
       .admin-btn {
         background-color: #28a745;
       }
@@ -73,6 +77,16 @@
       }
       .cancel-btn {
         background-color: #6c757d;
+      }
+
+      #users-list {
+        background: #343a40;
+        color: #00ff00;
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        overflow-x: auto;
+        margin-top: 15px;
       }
     </style>
   </head>
@@ -111,8 +125,9 @@
           Delete Account
         </button>
 
+        <!-- Admin Only Controls -->
         <button
-          id="admin-btn"
+          id="admin-dash-btn"
           class="admin-btn hidden"
           onclick="loadDashboard()"
           style="margin-top: 20px"
@@ -120,6 +135,23 @@
           Special Dashboard
         </button>
         <p id="dashboard-info" style="color: #d39e00; font-weight: bold"></p>
+
+        <!-- Updated Query Search Area -->
+        <input
+          type="text"
+          id="search-username"
+          class="hidden"
+          placeholder="Enter username to search (optional)"
+          style="margin-top: 10px"
+        />
+        <button
+          id="admin-users-btn"
+          class="admin-btn hidden"
+          onclick="viewUsers()"
+        >
+          View Users
+        </button>
+        <pre id="users-list" class="hidden"></pre>
 
         <button onclick="logout()" class="cancel-btn" style="margin-top: 20px">
           Sign Out
@@ -183,15 +215,19 @@
         const token = localStorage.getItem("token");
         if (!token) return;
 
-        // Reset visibility
         document.getElementById("auth-section").classList.add("hidden");
         document.getElementById("update-section").classList.add("hidden");
         document.getElementById("home-section").classList.remove("hidden");
 
+        // Toggle admin controls, including the new search input
         if (username === "admin") {
-          document.getElementById("admin-btn").classList.remove("hidden");
+          document.getElementById("admin-dash-btn").classList.remove("hidden");
+          document.getElementById("admin-users-btn").classList.remove("hidden");
+          document.getElementById("search-username").classList.remove("hidden");
         } else {
-          document.getElementById("admin-btn").classList.add("hidden");
+          document.getElementById("admin-dash-btn").classList.add("hidden");
+          document.getElementById("admin-users-btn").classList.add("hidden");
+          document.getElementById("search-username").classList.add("hidden");
         }
 
         const response = await fetch(`${API_URL}/home/${username}`, {
@@ -207,12 +243,47 @@
         }
       }
 
-      /* --- NEW DELETE LOGIC --- */
+      /* --- NEW QUERY PARAMETER LOGIC --- */
+      async function viewUsers() {
+        const currentUsername = localStorage.getItem("username");
+        const token = localStorage.getItem("token");
+        const usersListEl = document.getElementById("users-list");
+        const targetUser = document
+          .getElementById("search-username")
+          .value.trim();
+
+        // Dynamically append the query parameter if the input field is not empty
+        let endpoint = `${API_URL}/home/${currentUsername}/view-users`;
+        if (targetUser) {
+          endpoint += `?user_to_view=${encodeURIComponent(targetUser)}`;
+        }
+
+        try {
+          const response = await fetch(endpoint, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            usersListEl.classList.remove("hidden");
+            // If fetching a single user, FastAPI returns null if the record does not exist
+            usersListEl.innerText = data.users
+              ? JSON.stringify(data.users, null, 2)
+              : "User not found in database.";
+          } else {
+            const errData = await response.json();
+            alert(errData.detail || "Access Denied.");
+          }
+        } catch (err) {
+          alert("Error connecting to server.");
+        }
+      }
+
+      /* --- DELETE LOGIC --- */
       async function deleteAccount() {
         const username = localStorage.getItem("username");
         const token = localStorage.getItem("token");
 
-        // Confirm before executing the destructive action
         if (
           !confirm(
             "Are you sure you want to delete your account? This action cannot be undone.",
@@ -222,7 +293,6 @@
         }
 
         try {
-          // Hitting the delete endpoint
           const response = await fetch(
             `${API_URL}/home/${username}/delete-user`,
             {
@@ -233,10 +303,10 @@
           const data = await response.json();
 
           if (response.ok) {
-            logout(); // Clear session
+            logout();
             const msgEl = document.getElementById("message");
             msgEl.style.color = "green";
-            msgEl.innerText = `Account deleted: ${data.deleted}`; // Display the return message
+            msgEl.innerText = `Account deleted: ${data.deleted}`;
           } else {
             alert(data.detail || "Failed to delete account.");
           }
@@ -245,22 +315,23 @@
         }
       }
 
-      /* --- NEW UPDATE LOGIC --- */
+      /* --- UPDATE LOGIC --- */
       function openUpdateForm() {
         const currentUsername = localStorage.getItem("username");
-
-        // Hide Home, Show Update Form
         document.getElementById("home-section").classList.add("hidden");
         document.getElementById("update-section").classList.remove("hidden");
-
-        // Pre-fill the current data
         document.getElementById("update-username").value = currentUsername;
-        document.getElementById("update-password").value = ""; // Leave password blank for security
+        document.getElementById("update-password").value = "";
         document.getElementById("update-message").innerText = "";
+
+        // Hide dynamic admin data so it resets smoothly
+        document.getElementById("users-list").classList.add("hidden");
+        document.getElementById("users-list").innerText = "";
+        document.getElementById("search-username").value = "";
+        document.getElementById("dashboard-info").innerText = "";
       }
 
       function cancelUpdate() {
-        // Return to the home screen without saving
         document.getElementById("update-section").classList.add("hidden");
         document.getElementById("home-section").classList.remove("hidden");
       }
@@ -268,19 +339,16 @@
       async function submitUpdate() {
         const currentUsername = localStorage.getItem("username");
         const token = localStorage.getItem("token");
-
         const newUsername = document.getElementById("update-username").value;
         const newPassword = document.getElementById("update-password").value;
         const msgEl = document.getElementById("update-message");
 
-        // The FastAPI backend requires the User schema (username and password)
         const payload = {
           username: newUsername || null,
           password: newPassword || null,
         };
 
         try {
-          // Hitting the update endpoint using PUT [cite: 310]
           const response = await fetch(
             `${API_URL}/home/${currentUsername}/update`,
             {
@@ -295,21 +363,16 @@
 
           const data = await response.json();
 
-          // Replace the 'if (response.ok)' block in submitUpdate() with this:
           if (response.ok) {
-            // 1. If password changed, kill the session and force a re-login
             if (newPassword) {
               alert("Password updated successfully. Please log in again.");
               logout();
               return;
             }
-
-            // 2. If username changed, save the new name AND the new token
             if (newUsername) {
               localStorage.setItem("username", newUsername);
               localStorage.setItem("token", data.access_token);
             }
-
             alert(`Status: ${data.updated}`);
             showHome(localStorage.getItem("username"));
           } else {
@@ -343,18 +406,19 @@
         localStorage.removeItem("token");
         localStorage.removeItem("username");
 
-        // Hide everything except the auth section
         document.getElementById("auth-section").classList.remove("hidden");
         document.getElementById("home-section").classList.add("hidden");
         document.getElementById("update-section").classList.add("hidden");
 
         document.getElementById("dashboard-info").innerText = "";
+        document.getElementById("users-list").innerText = "";
+        document.getElementById("users-list").classList.add("hidden");
+        document.getElementById("search-username").value = "";
         document.getElementById("message").innerText = "Logged out.";
         document.getElementById("username").value = "";
         document.getElementById("password").value = "";
       }
 
-      // Persist login state on page refresh
       const savedToken = localStorage.getItem("token");
       const savedUser = localStorage.getItem("username");
       if (savedToken && savedUser) {
