@@ -232,7 +232,7 @@
 
         const response = await fetch(`${API_URL}/home/${username}`, {
           // Replaces the old Authorization header
-          credentials: "include", 
+          credentials: "include",
         });
 
         if (response.ok) {
@@ -248,7 +248,9 @@
       async function viewUsers() {
         const currentUsername = localStorage.getItem("username");
         const usersListEl = document.getElementById("users-list");
-        const targetUser = document.getElementById("search-username").value.trim();
+        const targetUser = document
+          .getElementById("search-username")
+          .value.trim();
 
         let endpoint = `${API_URL}/home/${currentUsername}/view-users`;
         if (targetUser) {
@@ -278,15 +280,22 @@
       async function deleteAccount() {
         const username = localStorage.getItem("username");
 
-        if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+        if (
+          !confirm(
+            "Are you sure you want to delete your account? This action cannot be undone.",
+          )
+        ) {
           return;
         }
 
         try {
-          const response = await fetch(`${API_URL}/home/${username}/delete-user`, {
-            method: "DELETE",
-            credentials: "include",
-          });
+          const response = await fetch(
+            `${API_URL}/home/${username}/delete-user`,
+            {
+              method: "DELETE",
+              credentials: "include",
+            },
+          );
           const data = await response.json();
 
           if (response.ok) {
@@ -333,14 +342,17 @@
         };
 
         try {
-          const response = await fetch(`${API_URL}/home/${currentUsername}/update`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
+          const response = await fetch(
+            `${API_URL}/home/${currentUsername}/update`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include", // Backend automatically issues a new session cookie here
+              body: JSON.stringify(payload),
             },
-            credentials: "include", // Backend automatically issues a new session cookie here
-            body: JSON.stringify(payload),
-          });
+          );
 
           const data = await response.json();
 
