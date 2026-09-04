@@ -13,8 +13,6 @@ def hash_func(password: str) -> str:
 def verify_password(password: str, stored_hash: str) -> bool:
     """Compare a password against a scrypt hash without timing leaks."""
     try:
-        # Accounts created by the original demo used SHA-256 without a salt.
-        # Permit one successful login so routes can upgrade those records below.
         if "$" not in stored_hash:
             return hmac.compare_digest(
                 hashlib.sha256(password.encode()).hexdigest(), stored_hash
